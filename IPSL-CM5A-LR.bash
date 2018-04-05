@@ -31,6 +31,7 @@ done
 
 vars='thetao so'
 for v in $vars; do
+  echo $v r1i1p1 PresentDay_ref_ctrl
   id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'piControl' 'r1i1p1' '2000-01-14' '2004-12-15' PresentDay_ref_ctrl`
   id=`python remap_to_latlon.py $id`
   sleep 2s
@@ -40,6 +41,7 @@ done
 for v in $vars; do
   realiz='r2i1p1 r3i1p1 r4i1p1 r5i1p1'
   for r in $realiz; do
+      echo $v $r PresentDay_ref
       id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'historical' $r '2000-01-14' '2004-12-15' PresentDay_ref`
       id=`python remap_to_latlon.py $id`
       sleep 2s
@@ -48,6 +50,7 @@ for v in $vars; do
 done
 
 for v in $vars; do
+    echo $v r1i1p1 PresentDay_ctrl
     id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'piControl' 'r1i1p1' '2013-01-14' '2017-12-15' PresentDay_ctrl`
     id=`python remap_to_latlon.py $id`
     sleep 2s
@@ -57,6 +60,7 @@ done
 for v in $vars; do
  realiz='r1i1p1 r2i1p1 r3i1p1 r4i1p1'
  for r in $realiz; do
+     echo $v $r PresentDay_ref_ctrl
      id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'rcp85' $r '2013-01-14' '2017-12-15' PresentDay`
      id=`python remap_to_latlon.py $id`
      id=`python remap_vertical.py $id`
@@ -64,25 +68,28 @@ for v in $vars; do
 done
 
 for v in $vars; do
-   realiz='r2i1p1 r3i1p1 r4i1p1 r5i1p1'
-    realiz='r1i1p1'
+    realiz='r2i1p1 r3i1p1 r4i1p1 r5i1p1'
     for r in $realiz; do
-	python time_average_model.py 'IPSL-CM5A-LR' $v 'historical' $r '1986-01-14' '2005-12-15' Future_ref
+	echo $v $r Future_ref
+	id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'historical' $r '1986-01-14' '2005-12-15' Future_ref`
 	id=`python remap_to_latlon.py $id`
 	sleep 2s
 	python remap_vertical.py $id
     done
 
+    echo $v r1i1p1 Future_ref
     id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'piControl' 'r1i1p1' '1986-01-14' '2005-12-15' Future_ref_ctrl`
     id=`python remap_to_latlon.py $id`
     sleep 2s
     python remap_vertical.py $id
+    echo $v r1i1p1 Future_ctrl
     id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'piControl' 'r1i1p1' '2086-01-14' '2100-12-15' Future_ctrl`
     id=`python remap_to_latlon.py $id`
     sleep 2s
     python remap_vertical.py $id
     realiz='r1i1p1 r2i1p1 r3i1p1 r4i1p1'
     for r in $realiz; do
+	echo $v $r Future
     	id=`python time_average_model.py 'IPSL-CM5A-LR' $v 'rcp85' $r '2086-01-14' '2100-12-15' Future`
     	id=`python remap_to_latlon.py $id`
     	sleep 2s
