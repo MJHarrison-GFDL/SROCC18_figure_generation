@@ -2,26 +2,26 @@
 Python and CDO software for the generation of CMIP5 ocean output on a common lat/lon/depth grid and figures
 
 
-## Requirements
+# Requirements
 
-python2 (https://www.python.org/)
-MIDAS python package (https:github.com/mjharriso/MIDAS)
-Climate Data Operator (CDO) (https://code.mpimet.mpg.de/projects/cdo/)
+* python2 (https://www.python.org/)
+* MIDAS python package (https:github.com/mjharriso/MIDAS)
+* Climate Data Operator (CDO) (https://code.mpimet.mpg.de/projects/cdo/)
 
-## Recommended
+# Recommended
 
-anaconda ( https://anaconda.org/ )
+* anaconda ( https://anaconda.org/ )
 
 ## Installation
 
 (asumed Python and Anaconda are installed)
 
-1. conda install -c matthewharrison midas
-2. conda install cartopy
-2. pip install dataset
-3. Install cdo package following instructions on website (http://www.studytrails.com/blog/install-climate-data-operator-cdo-with-netcdf-grib2-and-hdf5-support/)
+* conda install -c matthewharrison midas
+* conda install cartopy
+* pip install dataset
+* Install cdo package following instructions on website (http://www.studytrails.com/blog/install-climate-data-operator-cdo-with-netcdf-grib2-and-hdf5-support/)
 
-## Usage
+# Usage
 
 
 Ocean heating rates over the top 700m for PresentDay and Future Scenarios for all ensemble members (using a range of -5 to 5 W m-2)
