@@ -30,7 +30,7 @@ from scipy import stats
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model',type=str,help='model name',default=None)
-parser.add_argument('--type',type=str,help='heat_maps,zonal_sections,salt_maps',default=None)
+parser.add_argument('--type',type=str,help='heat_maps,zonal_sections,salt_maps,zonal_density_sections',default=None)
 parser.add_argument('--ztop',type=float,help='starting depth',default=0.)
 parser.add_argument('--zbot',type=float,help='starting depth',default=0.)
 parser.add_argument('--vmin',type=float,help='shading start',default=-5)
@@ -100,7 +100,7 @@ def  load_woa(woa_path='obs.r360x180.nc'):
         WOA.rename_field('so_tav','so')
         WOA.write_nc(woa_path,['thetao','so'])
     else:
-        WOA=state(woa_path,grid=grid_woa,fields=['thetao','so'],verbose=False)
+        WOA=state(woa_path,grid=grid_woa,fields=['thetao','so','sigma'],verbose=False)
     return grid_woa, WOA
 
 def load_depth_basin():
@@ -180,9 +180,12 @@ def show_zonal_trend(T,S,OBS,field='thetao',title='Zonal Avg Potential Temperatu
 #    masked_zonal_avg(T,basin_mask)
 #    masked_zonal_avg(S,basin_mask)
 
-    if field=='thetao':
+    if field=='thetao' or field=='sigma':
         V=T
-        clevs=[5,10,15,20,25,30]
+        if field=='thetao':
+            clevs=[5,10,15,20,25,30]
+        elif field=='sigma':
+            clevs=np.arange(25,34)
     elif field=='so':
         V=S
         clevs=np.arange(34,36.5,.25)
@@ -203,15 +206,15 @@ def show_zonal_trend(T,S,OBS,field='thetao',title='Zonal Avg Potential Temperatu
     cf=ax2.pcolormesh(x,y,zout,vmin=vmin,vmax=vmax,cmap=cmap)
     plt.colorbar(cf,ax=ax2,orientation='horizontal',fraction=0.1,pad=0.2)
     ctxt=ax1.contour(X,Y,zout,np.linspace(vmin,vmax,10),colors='w',linewidths=0.75)
-    ax1.clabel(ctxt,inline=True,fmt='%1.2f')
+    ax1.clabel(ctxt,inline=False,fmt='%1.2f')
     ctxt=ax2.contour(X,Y,zout,np.linspace(vmin,vmax,10),colors='w',linewidths=0.75)
-    ax2.clabel(ctxt,inline=True,fmt='%1.2f')
+    ax2.clabel(ctxt,inline=False,fmt='%1.2f')
 
     pval=sq(V.pval.copy())
     pval=np.ma.masked_where(pval<pval_tol,pval)
     if np.any(pval):
-        ax1.pcolormesh(x,y,pval,transform=ccrs.PlateCarree(),alpha=0.1,cmap=plt.cm.gray)
-        ax2.pcolormesh(x,y,pval,transform=ccrs.PlateCarree(),alpha=0.1,cmap=plt.cm.gray)
+        ax1.pcolormesh(x,y,pval,alpha=0.1,cmap=plt.cm.gray)
+        ax2.pcolormesh(x,y,pval,alpha=0.1,cmap=plt.cm.gray)
 
 #    sigma2=wright_eos(vars(T)['reference_masked_xav'],vars(S)['reference_masked_xav'],0.)-1.e3
 #    print 'max/min T_ref_xav= ',vars(T)['reference_masked_xav'].max(),vars(T)['reference_masked_xav'].min()
@@ -220,9 +223,9 @@ def show_zonal_trend(T,S,OBS,field='thetao',title='Zonal Avg Potential Temperatu
 
     tref=vars(OBS)[field+'_masked_xav']
     ctxt=ax1.contour(X,Y,sq(tref),clevs,colors='k')
-    ax1.clabel(ctxt,inline=True,fmt='%2.1f')
+    ax1.clabel(ctxt,inline=False,fmt='%2.1f')
     ctxt=ax2.contour(X,Y,sq(tref),clevs,colors='k')
-    ax2.clabel(ctxt,inline=True,fmt='%2.1f')
+    ax2.clabel(ctxt,inline=False,fmt='%2.1f')
     ax1.set_title(title)
     ax1.grid()
     ax2.grid()
@@ -375,6 +378,7 @@ if args.type == 'heat_maps':
         for v in ['thetao']:
             NDF=[];TREND=[];TREND_CTRL=[];PVAL=[]
             for model in ModelList:
+                print model
                 ctrl_ref=tb.find(variable=v,model=model,name=time_frame+'_ref_ctrl')
                 fcst_ref=tb.find(variable=v,model=model,name=time_frame+'_ref')
                 fcst_ctrl=tb.find(variable=v,model=model,name=time_frame+'_ctrl')
@@ -388,7 +392,6 @@ if args.type == 'heat_maps':
                 PR=load_tracer(flist_ref,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
                 CF=load_tracer(flist_ctrl,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
                 PF=load_tracer(flist,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
-#                print len(CR),len(PR),len(CF),len(PF)
                 depth_avg(CR,field=v,name=v+'_dz',normalize=False)
                 depth_avg(PR,field=v,name=v+'_dz',normalize=False)
                 depth_avg(CF,field=v,name=v+'_dz',normalize=False)
@@ -435,7 +438,76 @@ if args.type == 'heat_maps':
     show_trend(thetao['state'],field='thetao',title=tit,vmin=args.vmin,vmax=args.vmax,cmap=plt.cm.bwr,nyears=dTime[0],fname='heating_map_'+z_suffix+'_present.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
     thetao=Result[1]
     tit='Future Rate of Warming '+z_suffix+'m (W m-2)'
-    show_trend(thetao['state'],field='thetao',title=tit,vmin=-5,vmax=5,cmap=plt.cm.bwr,nyears=dTime[1],fname='heating_map_'+z_suffix+'_future.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
+    show_trend(thetao['state'],field='thetao',title=tit,vmin=args.vmin,vmax=args.vmax,cmap=plt.cm.bwr,nyears=dTime[1],fname='heating_map_'+z_suffix+'_future.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
+
+
+if args.type == 'salt_maps':
+    Result=[];dTime=[]
+    for time_frame in ['PresentDay','Future']:
+        for v in ['so']:
+            NDF=[];TREND=[];TREND_CTRL=[];PVAL=[]
+            for model in ModelList:
+                print model
+                ctrl_ref=tb.find(variable=v,model=model,name=time_frame+'_ref_ctrl')
+                fcst_ref=tb.find(variable=v,model=model,name=time_frame+'_ref')
+                fcst_ctrl=tb.find(variable=v,model=model,name=time_frame+'_ctrl')
+                fcst=tb.find(variable=v,model=model,name=time_frame)
+                ztop,zbot=(np.where(depths>args.ztop)[0][0],np.where(depths>args.zbot)[0][0])
+                flist_ctrl_ref=load_file_list(ctrl_ref)
+                flist_ref=load_file_list(fcst_ref)
+                flist_ctrl=load_file_list(fcst_ctrl)
+                flist=load_file_list(fcst)
+                CR=load_tracer(flist_ctrl_ref,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
+                PR=load_tracer(flist_ref,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
+                CF=load_tracer(flist_ctrl,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
+                PF=load_tracer(flist,grid=grid_woa,field=v,z_indices=np.arange(ztop,zbot))
+                depth_avg(CR,field=v,name=v+'_dz',normalize=False)
+                depth_avg(PR,field=v,name=v+'_dz',normalize=False)
+                depth_avg(CF,field=v,name=v+'_dz',normalize=False)
+                depth_avg(PF,field=v,name=v+'_dz',normalize=False)
+                for c in [CR,PR,CF,PF]:
+                    if len(c)==0:
+                        print 'THERE IS A PROBLEM WITH MODEL : ',model,' FOR ',time_frame,' ',v,' : data appears to be missing'
+                        raise()
+                ndf=len(CR)+len(PR)+len(CF)+len(PF)-3
+                NDF.append(ndf)
+                va=v+'_dz'
+                trend,trend_ctrl,pval=ensemble_trend(grid_woa,CR,PR,CF,PF,va)
+                TREND.append(trend)
+                TREND_CTRL.append(trend_ctrl)
+                PVAL.append(pval)
+
+            dTime.append(CF[0].var_dict[v]['dates'][0].year-CR[0].var_dict[v]['dates'][0].year)
+            S=state(grid=grid_woa,verbose=False)
+            vd=PF[0].var_dict[v].copy()
+            TREND=np.asarray(TREND)
+            trend=np.mean(TREND,axis=0)
+            TREND_CTRL=np.asarray(TREND_CTRL)
+            trend_ctrl=np.mean(TREND_CTRL,axis=0)
+            PVAL=np.asarray(PVAL)
+            NDF=np.asarray(NDF)
+#            print 'trend=',trend[0,:,148,348]
+#            print 'trend_ctrl=',trend_ctrl[0,:,148,348]
+#            quit()
+            S.add_field_from_array(trend,'delta',var_dict=vd)
+            S.add_field_from_array(trend_ctrl,'delta_ctrl',var_dict=vd)
+#            S.add_field_from_array(tref,'reference',var_dict=vd)
+            t2,pval=stats.ttest_ind(TREND,TREND_CTRL,axis=0)
+            pval[np.isnan(pval)]=0.0
+            vd['units']='none'
+            S.add_field_from_array(pval,'pval',var_dict=vd)
+            entry=dict(variable=v,state=S,ndf=NDF)
+            Result.append(entry)
+    WOA.adjust_thickness('thetao')
+    WOA.adjust_thickness('so')
+    so=Result[0]
+    z_suffix=str(np.int(args.ztop))+'to'+str(np.int(args.zbot))+'m'
+    tit='Present Day Rate of Salinity Change '+z_suffix+' (g kg-1 m-2 yr-1)'
+    print 'dTime= ',dTime
+    show_trend(so['state'],field='so',title=tit,vmin=args.vmin,vmax=args.vmax,cmap=plt.cm.bwr,nyears=dTime[0],fname='salt_map_'+z_suffix+'_present.png',ndf=so['ndf'],ModelList=ModelList,pval_tol=0.05)
+    so=Result[1]
+    tit='Future Rate of Salinity Change '+z_suffix+' (g kg m-2 yr-1)'
+    show_trend(so['state'],field='so',title=tit,vmin=args.vmin,vmax=args.vmax,cmap=plt.cm.bwr,nyears=dTime[1],fname='salt_map_'+z_suffix+'_future.png',ndf=so['ndf'],ModelList=ModelList,pval_tol=0.05)
 
 if args.type == 'zonal_sections':
     for region,reg_id in zip(['Global','Atlantic','Pacific','Indian'],[None,2,3,5]):
@@ -465,6 +537,7 @@ if args.type == 'zonal_sections':
                             print 'THERE IS A PROBLEM WITH MODEL : ',model,' FOR ',time_frame,' ',v,' : data appears to be missing'
                             raise()
                     ndf=len(CR)+len(PR)+len(CF)+len(PF)-3
+                    print v,len(CR),len(PR),len(CF),len(PF)
                     NDF.append(ndf)
                     va=v+'_masked_xav'
                     trend,trend_ctrl,pval=ensemble_trend(grid_woa,CR,PR,CF,PF,va)
@@ -486,7 +559,7 @@ if args.type == 'zonal_sections':
                 pval[np.isnan(pval)]=0.0
                 vd['units']='none'
                 S.add_field_from_array(pval,'pval',var_dict=vd)
-                entry=dict(variable=v,state=S,ndf=NDF,nyears=DTIME)
+                entry=dict(variable=v,state=S,ndf=NDF,nyears=DTIME[0])
                 Result.append(entry)
         WOA.adjust_thickness('thetao')
         WOA.adjust_thickness('so')
@@ -506,6 +579,71 @@ if args.type == 'zonal_sections':
         show_zonal_trend(thetao['state'],so['state'],WOA,field='thetao',title=tit,vmin=-5,vmax=5,cmap=plt.cm.bwr,nyears=thetao['nyears'],fname=region+'_zonal_thetao_future.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
         tit=region+' Future Change in Zonal Avg Salinity (PSU/50years)'
         show_zonal_trend(thetao['state'],so['state'],WOA,field='so',title=tit,vmin=-.5,vmax=.5,cmap=plt.cm.bwr,nyears=thetao['nyears'],fname=region+'_zonal_so_future.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
+
+
+if args.type == 'zonal_density_sections':
+    for region,reg_id in zip(['Global','Atlantic','Pacific','Indian'],[None,2,3,5]):
+        Result=[]
+        for time_frame in ['PresentDay','Future']:
+            for v in ['sigma']:
+                NDF=[];TREND=[];TREND_CTRL=[];PVAL=[];DTIME=[]
+                for model in ModelList:
+                    ctrl_ref=tb.find(variable=v,model=model,name=time_frame+'_ref_ctrl')
+                    fcst_ref=tb.find(variable=v,model=model,name=time_frame+'_ref')
+                    fcst_ctrl=tb.find(variable=v,model=model,name=time_frame+'_ctrl')
+                    fcst=tb.find(variable=v,model=model,name=time_frame)
+                    flist_ctrl_ref=load_file_list(ctrl_ref)
+                    flist_ref=load_file_list(fcst_ref)
+                    flist_ctrl=load_file_list(fcst_ctrl)
+                    flist=load_file_list(fcst)
+                    CR=load_tracer(flist_ctrl_ref,grid=grid_woa,field=v)
+                    PR=load_tracer(flist_ref,grid=grid_woa,field=v)
+                    CF=load_tracer(flist_ctrl,grid=grid_woa,field=v)
+                    PF=load_tracer(flist,grid=grid_woa,field=v)
+                    zonal_avg(CR,field=v,normalize=True,basin=basin,basin_mask=reg_id)
+                    zonal_avg(PR,field=v,normalize=True,basin=basin,basin_mask=reg_id)
+                    zonal_avg(CF,field=v,normalize=True,basin=basin,basin_mask=reg_id)
+                    zonal_avg(PF,field=v,normalize=True,basin=basin,basin_mask=reg_id)
+                    for c in [CR,PR,CF,PF]:
+                        if len(c)==0:
+                            print 'THERE IS A PROBLEM WITH MODEL : ',model,' FOR ',time_frame,' ',v,' : data appears to be missing'
+                            raise()
+                    ndf=len(CR)+len(PR)+len(CF)+len(PF)-3
+                    print v,len(CR),len(PR),len(CF),len(PF)
+                    NDF.append(ndf)
+                    va=v+'_masked_xav'
+                    trend,trend_ctrl,pval=ensemble_trend(grid_woa,CR,PR,CF,PF,va)
+                    TREND.append(trend)
+                    TREND_CTRL.append(trend_ctrl)
+                    PVAL.append(pval)
+                    DTIME.append(CF[0].var_dict[v]['dates'][0].year-CR[0].var_dict[v]['dates'][0].year)
+                S=state(grid=grid_woa,verbose=False)
+                vd=PF[0].var_dict[v].copy()
+                TREND=np.asarray(TREND)
+                trend=np.mean(TREND,axis=0)
+                TREND_CTRL=np.asarray(TREND_CTRL)
+                trend_ctrl=np.mean(TREND_CTRL,axis=0)
+                PVAL=np.asarray(PVAL)
+                NDF=np.asarray(NDF)
+                S.add_field_from_array(trend,'delta',var_dict=vd)
+                S.add_field_from_array(trend_ctrl,'delta_ctrl',var_dict=vd)
+                t2,pval=stats.ttest_ind(TREND,TREND_CTRL,axis=0)
+                pval[np.isnan(pval)]=0.0
+                vd['units']='none'
+                S.add_field_from_array(pval,'pval',var_dict=vd)
+                entry=dict(variable=v,state=S,ndf=NDF,nyears=DTIME[0])
+                Result.append(entry)
+        WOA.adjust_thickness('sigma')
+        zonal_avg([WOA],field='sigma',normalize=True,basin=basin,basin_mask=reg_id)
+        sigma=Result[0]
+        tit=region+' Present Day Change in Zonal Avg Density Anomaly (kg/m3/50years)'
+        show_zonal_trend(sigma['state'],sigma['state'],WOA,field='sigma',title=tit,vmin=-1,vmax=1,cmap=plt.cm.bwr,nyears=sigma['nyears'],fname=region+'_zonal_sigma_present.png',ndf=sigma['ndf'],ModelList=ModelList,pval_tol=0.05)
+#        tit=region+' Present Day Change in Zonal Avg Density Anomaly (kg/m3/50years)'
+#        show_zonal_trend(thetao['state'],so['state'],WOA,field='sigma1',title=tit,vmin=-.5,vmax=.5,cmap=plt.cm.bwr,nyears=thetao['nyears'],fname=region+'_zonal_sigma_present.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
+        sigma=Result[1]
+        tit=region+' Future Change in Zonal Avg Density Anomaly (kg/m3/50years)'
+        show_zonal_trend(sigma['state'],sigma['state'],WOA,field='sigma',title=tit,vmin=-1,vmax=1,cmap=plt.cm.bwr,nyears=sigma['nyears'],fname=region+'_zonal_sigma_future.png',ndf=sigma['ndf'],ModelList=ModelList,pval_tol=0.05)
+
 #        tit=region+' Future Change in Zonal Avg Density Anomaly (kg/m3/50years)'
 #        show_zonal_trend(thetao['state'],so['state'],WOA,field='sigma1',title=tit,vmin=-.5,vmax=.5,cmap=plt.cm.bwr,nyears=thetao['nyears'],fname=region+'_zonal_sigma_future.png',ndf=thetao['ndf'],ModelList=ModelList,pval_tol=0.05)
 
@@ -517,43 +655,3 @@ if args.type == 'zonal_sections':
 #        thetao=Result[2]
 #        so=Result[3]
 #        sfc_trend(so['state'],field='so',title='Future SSS change (psu)',vmin=-2,vmax=2,cmap=plt.cm.bwr,fname='sss_future.png')
-
-
-#    if args.type == 'heat_maps':
-#        depths=WOA.var_dict['thetao']['zax_data']
-#        ztop=np.where(depths>-1.)[0][0]
-#        zbot=np.where(depths>700.)[0][0]
-#            print depths[ztop:zbot]
-#            print 'ztop,zbot= ',ztop,zbot
-#        thetao=Result[0]
-#        so=Result[1]
-#        depth_avg_trend(thetao['state'],field='thetao',title='Present Day Rate of Warming 700-2000m (W m-2)',vmin=-5,vmax=5,cmap=plt.cm.bwr,z_indices=np.arange(ztop,zbot),nyears=12,fname='heating_map_700to2000m_present.png')
-#        thetao=Result[2]
-#        so=Result[3]
-    #     ztop=np.where(depths>-1.)[0][0]
-    #     zbot=np.where(depths>700.)[0][0]
-    #     depth_avg_trend(thetao['state'],field='thetao',title='Future Rate of Warming 0-700m (W m-2)',vmin=-5,vmax=5,cmap=plt.cm.bwr,z_indices=np.arange(ztop,zbot),nyears=94,fname='heating_map_0to700m_future.png')
-    #     thetao=Result[2]
-    #     so=Result[3]
-    #     ztop=np.where(depths>700.)[0][0]
-    #     zbot=np.where(depths>2000.)[0][0]
-    #     depth_avg_trend(thetao['state'],field='thetao',title='Future Rate of Warming 700-2000m (W m-2)',vmin=-5,vmax=5,cmap=plt.cm.bwr,z_indices=np.arange(ztop,zbot),nyears=94,fname='heating_map_700to2000m_future.png')
-    # if args.type == 'zonal_sections':
-    #     thetao=Result[0]
-    #     so=Result[1]
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.25,vmax=.25,title='Global Zonal Average Salinity Change (2013-2017) - (2001-2005)',fname='global_xav_so_present.png',basin=basin,basin_mask=None)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.25,vmax=.25,title='IndoPac Zonal Average Salinity Change (2013-2017) - (2001-2005)',fname='IndoPac_xav_so_present.png',basin=basin,basin_mask=5)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.25,vmax=.25,title='Atlantic Zonal Average Salinity Change (2013-2017) - (2001-2005)',fname='Atl_xav_so_present.png',basin=basin,basin_mask=2)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-.5,vmax=.5,title='Global Zonal Average Temperature Change (2013-2017) - (2001-2005)',fname='Global_xav_thetao_present.png',basin=basin,basin_mask=None)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-.5,vmax=.5,title='IndoPac Zonal Average Temperature Change (2013-2017) - (2001-2005)',fname='IndoPac_xav_thetao_present.png',basin=basin,basin_mask=5)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-.5,vmax=.5,title='Atlantic Zonal Average Temperature Change (2013-2017) - (2001-2005)',fname='Atl_xav_thetao_present.png',basin=basin,basin_mask=2)
-    #     thetao=Result[2]
-    #     so=Result[3]
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.5,vmax=.5,title='Global Zonal Average Salinity Change (2080-2100) - (1986-2006)',fname='global_xav_so_future.png',basin=basin,basin_mask=None)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.5,vmax=.5,title='IndoPac Zonal Average Salinity Change (2080-2100) - (1986-2006)',fname='IndoPac_xav_so_future.png',basin=basin,basin_mask=5)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'so',vmin=-.5,vmax=.5,title='Atlantic Zonal Average Salinity Change (2080-2100) - (1986-2006)',fname='Atl_xav_so_future.png',basin=basin,basin_mask=2)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-2.5,vmax=2.5,title='Global Zonal Average Temperature Change (2080-2100) - (1986-2006)',fname='Global_xav_thetao_future.png',basin=basin,basin_mask=None)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-2.5,vmax=2.5,title='IndoPac Zonal Average Temperature Change (2080-2100) - (1986-2006)',fname='IndoPac_xav_thetao_future.png',basin=basin,basin_mask=5)
-    #     zonal_avg_trend(thetao['state'],so['state'],WOA,'thetao',vmin=-2.5,vmax=2.5,title='Atlantic Zonal Average Temperature Change (2080-2100) - (1986-2006)',fname='Atl_xav_thetao_future.png',basin=basin,basin_mask=2)
-
-
